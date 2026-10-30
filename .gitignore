@@ -1,32 +1,19 @@
-# Prerequisites
-*.d
+bin/
+obj/
+.vs/
+x64/
+*.user
 
-# Compiled Object files
-*.slo
-*.lo
-*.o
-*.obj
-
-# Precompiled Headers
-*.gch
-*.pch
-
-# Compiled Dynamic libraries
-*.so
-*.dylib
-*.dll
-
-# Fortran module files
-*.mod
-*.smod
-
-# Compiled Static libraries
-*.lai
-*.la
-*.a
-*.lib
-
-# Executables
-*.exe
-*.out
-*.app
+# IDA et dumps (ne pas versionner)
+*.id0
+*.id1
+*.id2
+*.nam
+*.til
+*.i64
+*.idb
+*.dump621.bin
+FortniteClient-Win64-Shipping.exe
+PORTAGE_6.21.md
+PROMPT_SUITE.md
+PROMPT_PORTAGE_6.21.md
