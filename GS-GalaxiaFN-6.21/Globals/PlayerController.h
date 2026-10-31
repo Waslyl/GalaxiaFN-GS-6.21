@@ -110,6 +110,9 @@ namespace PlayerController
 
 		if (PlayerControllerAthena->IsInAircraft() && !PlayerControllerAthena->MyFortPawn)
 			GameModeAthena->RestartPlayer(PlayerControllerAthena);
+#ifdef LATE_GAME
+		LateGame621::GiveLoadoutOnExit(PlayerControllerAthena);
+#endif
 	}
 
 	void ServerTeleportToPlaygroundLobbyIslandHook(AFortPlayerControllerAthena* PlayerControllerAthena)

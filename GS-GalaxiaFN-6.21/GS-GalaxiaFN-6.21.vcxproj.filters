@@ -91,6 +91,9 @@
     <ClInclude Include="Offsets621.h">
       <Filter>Headers</Filter>
     </ClInclude>
+    <ClInclude Include="LateGame621.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
     <ClInclude Include="Fallbacks621.h">
       <Filter>Headers</Filter>
     </ClInclude>

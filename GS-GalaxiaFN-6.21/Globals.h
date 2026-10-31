@@ -14,10 +14,10 @@
 //#define SERVER4 // Port 7004
 #define SERVER5 // Port 7777
 
-//#define LATE_GAME // Mode Lategame
+#define LATE_GAME // Mode Lategame
 //#define ARENA // Mode Arene
 //#define ONESHOT //Mode Lategame Oneshot
-#define NORMAL // Tout les modes sauf Custom (c surtout pour les webhook sinon rien s'envoie)
+//#define NORMAL // Tout les modes sauf Custom (c surtout pour les webhook sinon rien s'envoie)
 //#define PLAYGROUND // Terrain de jeu + commandes cheats (bot, loot...)
 //#define CREATIVE // Creative
 //#define DODGE_ROCKET //Mode Esquive Rocket

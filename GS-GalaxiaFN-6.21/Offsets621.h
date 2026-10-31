@@ -44,6 +44,10 @@ namespace Offsets621
 	constexpr uintptr_t BotCrashFix = 0x0;                              // [OFFSET-TODO-6.21] sub_7FF6B9034770, crash a1 invalide (bots) (8.51 = 0xdc4770)
 	constexpr uintptr_t MemoryLeakFix = 0x0;                            // [OFFSET-TODO-6.21] sub_7FF6B8E55480, fuite memoire (8.51 = 0xbe5480)
 	constexpr uintptr_t StartAircraftPhase = 0xC91F80;                  // AFortGameModeAthena::StartAircraftPhase (8.51 = 0xfb8070) : logs "AFortGameModeAthena::StartAircraftPhase: ...", (GameMode, octet)
+	constexpr uintptr_t StartAircraftFlight = 0xC345B0;                 // AFortAthenaAircraft : FlightInfo -> horaires +0x3E0..0x3F4, (Aircraft, float ServerTime)
+	constexpr uintptr_t EndAircraftPhase = 0xC93F50;                    // (GameMode, octet DL, octet R8B) -> bool ; remet bSafeZoneActive a 0 a la fin du bus
+	constexpr uintptr_t StartSafeZone = 0xC911E0;                       // AFortGameModeAthena : cree l'indicateur, phase 0, bSafeZoneActive ; (GameMode) seul
+	constexpr uintptr_t AdvanceSafeZone = 0xC93420;                     // AFortGameModeAthena : incremente SafeZonePhase, applique centres/definition ; (GameMode) seul
 	constexpr uintptr_t HandlePostSafeZonePhaseChanged = 0x0;           // [OFFSET-TODO-6.21] AFortGameModeAthena::HandlePostSafeZonePhaseChanged (8.51 = 0xfb9830)
 	constexpr uintptr_t PickTeam = 0xC862C0;                            // AFortGameModeAthena::PickTeam (8.51 = 0xfa9b20) : logs "PickTeam for [%s] ...", (GameMode, EFortTeam, PC)
 	constexpr uintptr_t Restart = 0x10FD9B0;                            // AFortGameSessionDedicatedAthena::Restart, vtable 0x3C29E00 + 0x688 ; tailcall base 0x10FD6E0 (8.51 = 0x153cda0)

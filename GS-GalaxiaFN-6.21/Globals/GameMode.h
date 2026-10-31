@@ -5,7 +5,7 @@
 #include "discord.h"
 
 #include <curl/curl.h>
-
+#include "../LateGame621.h"
 extern std::string storedSessionId;
 
 enum ENetMode
@@ -70,6 +70,9 @@ namespace GameMode
 		bGetAircraftLoc = false;
 		Globals::World = nullptr;
 		Beacon::Beacon = nullptr;
+#ifdef LATE_GAME
+		LateGame621::Reset();
+#endif
 	}
 
 	__int64 PreLoginHook() { return 0; };
@@ -168,7 +171,7 @@ namespace GameMode
 
 			GameModeAthena->GameContextTags.GameplayTags.Clear();
 			
-			for (int32 i = 0; i < PlaylistAthena->GameplayTagContainer.GameplayTags.Num(); i++) // Pour les défis plus tard
+			for (int32 i = 0; i < PlaylistAthena->GameplayTagContainer.GameplayTags.Num(); i++) // Pour les dï¿½fis plus tard
 			{
 				FGameplayTag GameplayTag = PlaylistAthena->GameplayTagContainer.GameplayTags[i];
 				if (!GameplayTag.TagName.IsValid()) continue;
@@ -188,7 +191,7 @@ namespace GameMode
 
 			UFortZoneTheme* ZoneTheme = GameStateAthena->ZoneTheme;
 
-			if (ZoneTheme) // sah jsp si c'est utile mais ta capter faut les choqués
+			if (ZoneTheme) // sah jsp si c'est utile mais ta capter faut les choquï¿½s
 			{
 				ZoneTheme->PlaylistId = PlaylistAthena->PlaylistId;
 				ZoneTheme->TeamSize = PlaylistAthena->MaxTeamSize;
@@ -341,14 +344,14 @@ namespace GameMode
 		curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
 
 		if (res != CURLE_OK) {
-			std::cerr << "Erreur de requête: " << curl_easy_strerror(res) << std::endl;
+			std::cerr << "Erreur de requï¿½te: " << curl_easy_strerror(res) << std::endl;
 		}
 		else {
 			if (http_code == 200) {
-				std::cout << "Réponse 200 OK reçue." << std::endl;
+				std::cout << "Rï¿½ponse 200 OK reï¿½ue." << std::endl;
 			}
 			else {
-				std::cout << "Code de réponse HTTP: " << http_code << std::endl;
+				std::cout << "Code de rï¿½ponse HTTP: " << http_code << std::endl;
 			}
 		}
 		curl_easy_cleanup(curl);
@@ -377,7 +380,8 @@ namespace GameMode
 			PlayerPawn->bCanBeDamaged = false;
 		}
 
-#if defined(LATE_GAME) || defined(ONESHOT) || defined(DODGE_ROCKET) || defined(ARENA)
+		// [8.51-ONLY] Le nouveau LATE_GAME conserve le bus natif au lieu de teleporter les joueurs.
+#if defined(ONESHOT) || defined(DODGE_ROCKET) || defined(ARENA)
 		AFortGameStateAthena* GameStateAthena = Cast<AFortGameStateAthena>(GameModeAthena->GameState);
 
 		if (GameStateAthena)
@@ -405,8 +409,12 @@ namespace GameMode
 
 		return true;
 #else
-		return StartAircraftPhaseOG(GameModeAthena, a2);
-#endif // define(LATE_GAME) || defined(ONESHOT) || defined(DODGE_ROCKET) || defined(ARENA)
+		const bool Started = StartAircraftPhaseOG(GameModeAthena, a2);
+#ifdef LATE_GAME
+		if (Started) LateGame621::StartZone(GameModeAthena);
+#endif
+		return Started;
+#endif // defined(ONESHOT) || defined(DODGE_ROCKET) || defined(ARENA)
 	}
 
 	APawn* SpawnDefaultPawnForHook(AFortGameModeAthena* GameModeAthena, AController* NewPlayer, AActor* StartSpot)
@@ -875,14 +883,14 @@ namespace GameMode
 		curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
 
 		if (res != CURLE_OK) {
-			std::cerr << "Erreur de requête: " << curl_easy_strerror(res) << std::endl;
+			std::cerr << "Erreur de requï¿½te: " << curl_easy_strerror(res) << std::endl;
 		}
 		else {
 			if (http_code == 200) {
-				std::cout << "Réponse 200 OK reçue." << std::endl;
+				std::cout << "Rï¿½ponse 200 OK reï¿½ue." << std::endl;
 			}
 			else {
-				std::cout << "Code de réponse HTTP: " << http_code << std::endl;
+				std::cout << "Code de rï¿½ponse HTTP: " << http_code << std::endl;
 			}
 		}
 		curl_easy_cleanup(curl);
@@ -922,13 +930,16 @@ namespace GameMode
 		if (!GameModeAthena || World != MatchWorld || GameModeAthena != MatchGameMode || bRestart)
 			return;
 
+#ifdef LATE_GAME
+		LateGame621::Tick(GameModeAthena);
+#endif
+
 		static const FName WaitingPostMatch = UKismetStringLibrary::Conv_StringToName(L"WaitingPostMatch");
 		static const FName LeavingMap = UKismetStringLibrary::Conv_StringToName(L"LeavingMap");
 		if (GameModeAthena->MatchState == LeavingMap)
 			return;
 
-		// [GALAXIA PATCH] Le getter 6.21 (0xC79660 -> 0xEE51B0) cree une FortGameSession normale.
-		// RestartGame accepte AGameSession : exiger Dedicated ici annulait toute relance.
+		// [GALAXIA PATCH] La session 6.21 normale suffit : ne pas exiger Dedicated.
 		auto* Session = GameModeAthena->GameSession;
 		if (!RestartAt && GameModeAthena->MatchState == WaitingPostMatch)
 			QueueRestartHook(Session);
@@ -937,7 +948,7 @@ namespace GameMode
 			RestartHook(Session);
 	}
 
-#if defined(LATE_GAME) || defined(ARENA)
+#if defined(ARENA)
 	void (*HandleStartingNewPlayerOG)(AFortGameModeAthena* GameModeAthena, APlayerController* NewPlayer);
 	void HandleStartingNewPlayerHook(AFortGameModeAthena* GameModeAthena, APlayerController* NewPlayer)
 	{
@@ -993,8 +1004,8 @@ namespace GameMode
 		// MinHook::HookVTable(DefaultGameModeAthena, 0x618 / 8, SpawnDefaultPawnForHook, nullptr, "AFortGameModeAthena::SpawnDefaultPawnFor");
 		MinHook::HookRPC<SpawnDefaultPawnForHook>(DefaultGameModeAthena, "GameModeBase", "SpawnDefaultPawnFor", nullptr, 0x618 / 8);
 
-#if defined(LATE_GAME) || defined(ARENA)
-		// Début d'un fix de merde
+#if defined(ARENA)
+		// Dï¿½but d'un fix de merde
 		// Hook par ProcessEvent (parametres verifies au demarrage) (8.51 = 0x648 / 8)
 		// MinHook::HookVTable(DefaultGameModeAthena, 0x648 / 8, HandleStartingNewPlayerHook, (LPVOID*)(&HandleStartingNewPlayerOG), "AFortGameModeAthena::HandleStartingNewPlayer");
 		MinHook::HookRPC<HandleStartingNewPlayerHook>(DefaultGameModeAthena, "GameModeBase", "HandleStartingNewPlayer", (void**)(&HandleStartingNewPlayerOG), 0x648 / 8);
@@ -1021,6 +1032,10 @@ namespace GameMode
 		// [GALAXIA PATCH] Intercepter aussi la demande native sur deconnexion du dernier joueur.
 		if (Offsets621::IsExpectedBuild())
 			MinHook::HookNative(Offsets621::Restart, "Restart", QueueRestartHook, nullptr);
+
+#ifdef LATE_GAME
+		LateGame621::Init();
+#endif
 
 		FN_LOG(LogInit, Log, "InitGameMode Success!");
 	}

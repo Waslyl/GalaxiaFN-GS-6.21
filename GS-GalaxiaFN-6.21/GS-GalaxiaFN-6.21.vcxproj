@@ -146,6 +146,7 @@
     <ClInclude Include="UtfN.hpp" />
     <ClInclude Include="PropertyFixup.hpp" />
     <ClInclude Include="Offsets621.h" />
+    <ClInclude Include="LateGame621.h" />
     <ClInclude Include="Fallbacks621.h" />
     <ClInclude Include="util.h" />
   </ItemGroup>

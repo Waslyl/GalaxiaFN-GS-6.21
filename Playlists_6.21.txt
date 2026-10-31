@@ -1,0 +1,35 @@
+Fortnite Version 6.210000
+
+[Tournament] /Game/Athena/Playlists/Showdown/Playlist_Showdown_Squads.Playlist_Showdown_Squads
+[Tournament] /Game/Athena/Playlists/Showdown/Playlist_Showdown_Solo.Playlist_Showdown_Solo
+[Tournament] /Game/Athena/Playlists/Showdown/Playlist_Showdown_Duos.Playlist_Showdown_Duos
+[Playground] /Game/Athena/Playlists/Playground/Playlist_Playground.Playlist_Playground
+[High Explosives] /Game/Athena/Playlists/HighExplosives/Playlist_HighExplosives_Squads.Playlist_HighExplosives_Squads
+[High Explosives] /Game/Athena/Playlists/HighExplosives/Playlist_HighExplosives_Solo.Playlist_HighExplosives_Solo
+[Squads] /Game/Athena/Playlists/Fortnite/Playlist_Fortnite_B_Squads.Playlist_Fortnite_B_Squads
+[Solo] /Game/Athena/Playlists/Fortnite/Playlist_Fortnite_B_Solo.Playlist_Fortnite_B_Solo
+[Duos] /Game/Athena/Playlists/Fortnite/Playlist_Fortnite_B_Duos.Playlist_Fortnite_B_Duos
+[Final Five] /Game/Athena/Playlists/Fortnite/Playlist_Fortnite.Playlist_Fortnite
+[Tournament] /Game/Athena/Playlists/Deimos/Playlist_Deimos_SquadShow.Playlist_Deimos_SquadShow
+[Fortnitemares] /Game/Athena/Playlists/Deimos/Playlist_Deimos_SquadCN.Playlist_Deimos_SquadCN
+[Fortnitemares] /Game/Athena/Playlists/Deimos/Playlist_Deimos_Squad.Playlist_Deimos_Squad
+[Tournament] /Game/Athena/Playlists/Deimos/Playlist_Deimos_SoloShow.Playlist_Deimos_SoloShow
+[Fortnitemares] /Game/Athena/Playlists/Deimos/Playlist_Deimos_SoloCN.Playlist_Deimos_SoloCN
+[Fortnitemares] /Game/Athena/Playlists/Deimos/Playlist_Deimos_Solo.Playlist_Deimos_Solo
+[Tournament] /Game/Athena/Playlists/Deimos/Playlist_Deimos_DuoShow.Playlist_Deimos_DuoShow
+[Fortnitemares] /Game/Athena/Playlists/Deimos/Playlist_Deimos_DuoCN.Playlist_Deimos_DuoCN
+[Fortnitemares] /Game/Athena/Playlists/Deimos/Playlist_Deimos_Duo.Playlist_Deimos_Duo
+[Blitz! v2] /Game/Athena/Playlists/Blitz/Playlist_Blitz_Squads.Playlist_Blitz_Squads
+[Blitz! v2] /Game/Athena/Playlists/Blitz/Playlist_Blitz_Solo.Playlist_Blitz_Solo
+[Blitz! v2] /Game/Athena/Playlists/Blitz/Playlist_Blitz_Duos.Playlist_Blitz_Duos
+[Soaring 50's] /Game/Athena/Playlists/50v50/Soaring/Playlist_Soaring_50s.Playlist_Soaring_50s
+[Disco Domination] /Game/Athena/Playlists/50v50/Disco/Playlist_Disco_Alt.Playlist_Disco_Alt
+[Disco Domination] /Game/Athena/Playlists/50v50/Disco/Playlist_Disco_40_Alt.Playlist_Disco_40_Alt
+[Disco Domination] /Game/Athena/Playlists/50v50/Disco/Playlist_Disco_40.Playlist_Disco_40
+[Disco Domination] /Game/Athena/Playlists/50v50/Disco/Playlist_Disco_32_Alt.Playlist_Disco_32_Alt
+[Disco Domination] /Game/Athena/Playlists/50v50/Disco/Playlist_Disco_32.Playlist_Disco_32
+[Disco Domination] /Game/Athena/Playlists/50v50/Disco/Playlist_Disco.Playlist_Disco
+[50 V 50] /Game/Athena/Playlists/50v50/Playlist_50v50.Playlist_50v50
+[Squads] /Game/Athena/Playlists/Playlist_DefaultSquad.Playlist_DefaultSquad
+[Solo] /Game/Athena/Playlists/Playlist_DefaultSolo.Playlist_DefaultSolo
+[Duos] /Game/Athena/Playlists/Playlist_DefaultDuo.Playlist_DefaultDuo
