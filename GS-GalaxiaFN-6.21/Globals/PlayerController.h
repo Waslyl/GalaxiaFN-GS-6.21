@@ -832,10 +832,112 @@ namespace PlayerController
 	// [8.51-ONLY] UFortControllerComponent_Interaction n'existe pas en 6.21 : ServerAttemptInteract est sur AFortPlayerController
 	// void (*ServerAttemptInteractOG)(UFortControllerComponent_Interaction* ControllerComponent, AActor* ReceivingActor, UPrimitiveComponent* InteractComponent, ETInteractionType InteractType, UObject* OptionalObjectData);
 	// void ServerAttemptInteractHook(UFortControllerComponent_Interaction* ControllerComponent, AActor* ReceivingActor, UPrimitiveComponent* InteractComponent, ETInteractionType InteractType, UObject* OptionalObjectData)
+	// [GALAXIA PATCH] Contexte limite au RPC courant : aucun autre retrait d'objet n'est remplace.
+	struct FVendingTransaction621
+	{
+		AFortPlayerController* PlayerController;
+		UFortWorldItemDefinition* InputItem;
+		int32 Cost;
+		int32 Paid = 0;
+		bool PaymentAttempted = false;
+	};
+	thread_local FVendingTransaction621* VendingTransaction621 = nullptr;
+	int32 (*RemoveVendingCostOG)(AFortPlayerController*, UFortWorldItemDefinition*, int32, bool);
+
+	int64_t CountVendingInput621(AFortPlayerController* PC, UFortWorldItemDefinition* Definition)
+	{
+		int64_t Count = 0;
+		if (PC && PC->WorldInventory && Definition)
+		{
+			for (auto* Item : PC->WorldInventory->Inventory.ItemInstances)
+				if (Item && Item->ItemEntry.ItemDefinition == Definition && Item->ItemEntry.Count > 0)
+					Count += Item->ItemEntry.Count;
+		}
+		return Count;
+	}
+
+	int32 RemoveVendingCostHook(AFortPlayerController* PC, UFortWorldItemDefinition* Definition, int32 Amount, bool bForceRemoval)
+	{
+		const uintptr_t ReturnRva = uintptr_t(_ReturnAddress()) - InSDKUtils::GetImageBase();
+		auto* Transaction = VendingTransaction621;
+		if (ReturnRva != Offsets621::ItemCollector_RemoveCostReturn || !Transaction ||
+			PC != Transaction->PlayerController || Definition != Transaction->InputItem)
+			return RemoveVendingCostOG(PC, Definition, Amount, bForceRemoval);
+
+		// Le collecteur natif a deja valide autorite, etat, distance, ressource et disponibilite.
+		if (Transaction->PaymentAttempted || Amount <= 0 || Amount != Transaction->Cost)
+			return 0;
+		Transaction->PaymentAttempted = true;
+		const int64_t Before = CountVendingInput621(PC, Definition);
+		if (Before < Amount)
+			return 0;
+
+		int32 Remaining = Amount;
+		auto* WorldInventory = PC->WorldInventory;
+		// Parcours inverse : un retrait peut enlever l'instance courante du tableau.
+		for (int32 i = WorldInventory->Inventory.ItemInstances.Num() - 1; i >= 0 && Remaining > 0; --i)
+		{
+			auto* Item = WorldInventory->Inventory.ItemInstances[i];
+			if (!Item || Item->ItemEntry.ItemDefinition != Definition || Item->ItemEntry.Count <= 0)
+				continue;
+			const FGuid Guid = Item->ItemEntry.ItemGuid;
+			const int32 Take = std::min(Remaining, Item->ItemEntry.Count);
+			if (!Inventory::RemoveInventoryItem(PC, Guid, Take))
+				break;
+			Remaining -= Take;
+		}
+		Inventory::UpdateInventory(WorldInventory);
+		const int64_t Removed = Before - CountVendingInput621(PC, Definition);
+		if (Remaining == 0 && Removed == Amount)
+			Transaction->Paid = Amount;
+		return Transaction->Paid;
+	}
+
+	struct FVendingScope621
+	{
+		FVendingTransaction621* Previous;
+		explicit FVendingScope621(FVendingTransaction621* Transaction) : Previous(VendingTransaction621)
+		{
+			VendingTransaction621 = Transaction;
+		}
+		~FVendingScope621() { VendingTransaction621 = Previous; }
+	};
+
 	void (*ServerAttemptInteractOG)(AFortPlayerController* PlayerController, AActor* ReceivingActor, UPrimitiveComponent* InteractComponent, ETInteractionType InteractType, UObject* OptionalObjectData);
 	void ServerAttemptInteractHook(AFortPlayerController* PlayerController, AActor* ReceivingActor, UPrimitiveComponent* InteractComponent, ETInteractionType InteractType, UObject* OptionalObjectData)
 	{
-		ServerAttemptInteractOG(PlayerController, ReceivingActor, InteractComponent, InteractType, OptionalObjectData);
+		// [GALAXIA PATCH] Conserver les refus natifs ; le butin exige un debit constate dans CE RPC.
+		auto* Collector = Cast<ABuildingItemCollectorActor>(ReceivingActor);
+		bool bVendingMachine = false;
+		for (auto* Class = Collector ? Collector->Class : nullptr; Class; Class = static_cast<UClass*>(Class->SuperStruct))
+			if (Class->GetName() == "B_Athena_VendingMachine_C")
+				bVendingMachine = true;
+		if (!bVendingMachine || !PlayerController || !PlayerController->WorldInventory)
+		{
+			ServerAttemptInteractOG(PlayerController, ReceivingActor, InteractComponent, InteractType, OptionalObjectData);
+			return;
+		}
+
+		auto* RequestedInput = Cast<UFortWorldItemDefinition>(OptionalObjectData);
+		bool bHasOutput = false;
+		for (const auto& Collection : Collector->ItemCollections)
+			if (Collection.InputItem == RequestedInput)
+				for (const auto& Entry : Collection.OutputItemEntry)
+					if (Entry.ItemDefinition && Entry.Count > 0)
+						bHasOutput = true;
+
+		const int32 Cost = RequestedInput && bHasOutput ? Collector->GetDepositGoal(PlayerController, RequestedInput) : -1;
+		const int64_t Before = CountVendingInput621(PlayerController, RequestedInput);
+		FVendingTransaction621 Transaction{ PlayerController, RequestedInput, Cost };
+		{
+			FVendingScope621 Scope(Cost > 0 && bHasOutput ? &Transaction : nullptr);
+			ServerAttemptInteractOG(PlayerController, ReceivingActor, InteractComponent, InteractType, OptionalObjectData);
+		}
+		const int64_t After = CountVendingInput621(PlayerController, RequestedInput);
+		if (Cost <= 0 || Transaction.Paid != Cost || Before - After != Cost)
+		{
+			return;
+		}
 
 		// AFortPlayerControllerAthena* PlayerControllerAthena = Cast<AFortPlayerControllerAthena>(ControllerComponent->GetOwner());
 		AFortPlayerControllerAthena* PlayerControllerAthena = Cast<AFortPlayerControllerAthena>(PlayerController);
@@ -847,7 +949,7 @@ namespace PlayerController
 
 		if (BuildingItemCollectorActor)
 		{
-			UFortWorldItemDefinition* ActiveInputItem = BuildingItemCollectorActor->ActiveInputItem;
+			UFortWorldItemDefinition* ActiveInputItem = RequestedInput; // ressource payee, figee avant l'appel natif
 			if (!ActiveInputItem) return;
 
 			const float LootSpawnLocationX = BuildingItemCollectorActor->LootSpawnLocation.X;
@@ -873,7 +975,7 @@ namespace PlayerController
 					FFortItemEntry ItemEntry = OutputItemEntry[j];
 
 					UFortWorldItemDefinition* ItemDefinition = Cast<UFortWorldItemDefinition>(ItemEntry.ItemDefinition);
-					if (!ItemDefinition) continue;
+					if (!ItemDefinition || ItemEntry.Count <= 0) continue;
 
 					FFortItemEntry NewItemEntry = Inventory::CreateItemEntry(ItemDefinition, ItemEntry.Count, ItemEntry.Durability, ItemEntry.Level, ItemEntry.LoadedAmmo);
 					AFortPickupAthena* Pickup = Util::SpawnActor<AFortPickupAthena>(AFortPickupAthena::StaticClass(), SpawnLocation);
@@ -900,12 +1002,15 @@ namespace PlayerController
 					}
 				}
 
-				static UFunction* DoVendDeath = FindObjectFast<UFunction>("/Game/Athena/Items/Gameplay/VendingMachine/B_Athena_VendingMachine.B_Athena_VendingMachine_C.DoVendDeath");
-				// [GALAXIA PATCH] 6.21 : DoVendDeath est introuvable a ce chemin, ProcessEvent plantait avec une fonction nulle
-				if (DoVendDeath)
-					BuildingItemCollectorActor->ProcessEvent(DoVendDeath, nullptr);
-
-				BuildingItemCollectorActor->K2_DestroyActor();
+				// [8.51-ONLY] DoVendDeath introuvable en 6.21 ; ne pas detruire le distributeur pendant ses FX natifs.
+// 				static UFunction* DoVendDeath = FindObjectFast<UFunction>("/Game/Athena/Items/Gameplay/VendingMachine/B_Athena_VendingMachine.B_Athena_VendingMachine_C.DoVendDeath");
+// 				// [GALAXIA PATCH] 6.21 : DoVendDeath est introuvable a ce chemin, ProcessEvent plantait avec une fonction nulle
+// 				if (DoVendDeath)
+// 					BuildingItemCollectorActor->ProcessEvent(DoVendDeath, nullptr);
+//
+// 				BuildingItemCollectorActor->K2_DestroyActor();
+				// [GALAXIA PATCH] Laisser BlueprintOnInteract gerer les FX disponibles en 6.21.
+				break; // une collection et une recompense par paiement
 			}
 		}
 	}
@@ -981,6 +1086,12 @@ namespace PlayerController
 
 		// Hook par ProcessEvent (parametres verifies au demarrage)
 		MinHook::HookRPC<ServerAttemptInteractHook>(FortPlayerControllerAthenaDefault, "FortPlayerController", "ServerAttemptInteract", (void**)(&ServerAttemptInteractOG));
+
+		if (Offsets621::IsExpectedBuild())
+		{
+			const uintptr_t AddressRemoveVendingCost = MinHook::FindPatternUnique(Patterns::RemoveVendingCost, "RemoveVendingCost");
+			MinHook::HookAddress(AddressRemoveVendingCost, "RemoveVendingCost", RemoveVendingCostHook, (void**)(&RemoveVendingCostOG));
+		}
 
 		uintptr_t AddressRemoveInventoryItem = MinHook::FindPatternUnique(Patterns::RemoveInventoryItem, "RemoveInventoryItem");
 		uintptr_t AddressModifyLoadedAmmo = MinHook::FindPatternUnique(Patterns::ModifyLoadedAmmo, "ModifyLoadedAmmo");

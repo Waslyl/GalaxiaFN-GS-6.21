@@ -93,5 +93,8 @@ namespace Patterns
 	// [GALAXIA PATCH] Helper POI/pawn 6.21 a 0xCEAD50, appele par CheckPawnOverlap (retour 0xCD4DF0).
 	// Le crash a 0xCEAE04 lit les Bounds du BrushComponent (+0x340) nul, apres ajout de +0x140.
 	constexpr const char* PoiPawnOverlap = "48 8B C4 48 89 58 08 48 89 70 10 57 48 81 EC F0 00 00 00 48 8B BA 98 03 00 00 48 8B DA 0F 29 70 E8 48 8B F1";
+	// [GALAXIA PATCH] K2_RemoveItemFromPlayer 6.21, wrapper 0xF770D0 : le corps client saute vers return 0.
+	// Signature confirmee par l'exec UFunction 0x155366F et l'appel du collecteur a 0xD56E67.
+	constexpr const char* RemoveVendingCost = "48 85 C9 74 09 48 85 D2 0F 85 82 54 33 FF 33 C0 C3";
 	constexpr const char* CollectGarbageInternal = "E9 ? ? ? ? 48 BA ? ? ? ? ? ? ? ? 48 0F 45 CA E9 ? ? ? ? 48 8B 8C 24 ? ? ? ? 48 33 CC E9 ? ? ? ?"; // Fait
 }

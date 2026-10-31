@@ -29,6 +29,10 @@ namespace Offsets621
 	constexpr uintptr_t SpawnContextCheck = 0x191D2E0;                  // CanCreateInCurrentContext (8.51 = 0x1e2ae20) : test juste avant "Unable to spawn class '%s' due to client/server context." dans UWorld::SpawnActor (0x2702010), seul appelant
 	constexpr uintptr_t BugItGo = 0x0;                                  // [OFFSET-TODO-6.21] UCheatManager::BugItGo (8.51 = 0x2a77100)
 
+	// [GALAXIA PATCH] Retour de l'appel au retrait dans la transaction native du collecteur.
+	// Filtre du hook de paiement : aucun autre appelant de K2_RemoveItemFromPlayer n'est modifie.
+	constexpr uintptr_t ItemCollector_RemoveCostReturn = 0xD56E6C;
+
 	// ===== Session / GameMode =====
 	// [GALAXIA PATCH] Deux appels FParse::Param(..., L"NoAuth") du controle de session 6.21.
 	// Adresses de retour (CALL + 5), verifiees dans le dump : filtre strict du hook SessionNoAuthParam.
