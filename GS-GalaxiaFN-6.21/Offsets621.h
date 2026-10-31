@@ -48,6 +48,7 @@ namespace Offsets621
 	constexpr uintptr_t EndAircraftPhase = 0xC93F50;                    // (GameMode, octet DL, octet R8B) -> bool ; remet bSafeZoneActive a 0 a la fin du bus
 	constexpr uintptr_t StartSafeZone = 0xC911E0;                       // AFortGameModeAthena : cree l'indicateur, phase 0, bSafeZoneActive ; (GameMode) seul
 	constexpr uintptr_t AdvanceSafeZone = 0xC93420;                     // AFortGameModeAthena : incremente SafeZonePhase, applique centres/definition ; (GameMode) seul
+	constexpr uintptr_t TickSafeZone = 0xC97660;                        // (GameMode, float DeltaSeconds xmm1), appels 0xC95267/0xC952ED ; force apercu bus +0x369
 	constexpr uintptr_t HandlePostSafeZonePhaseChanged = 0x0;           // [OFFSET-TODO-6.21] AFortGameModeAthena::HandlePostSafeZonePhaseChanged (8.51 = 0xfb9830)
 	constexpr uintptr_t PickTeam = 0xC862C0;                            // AFortGameModeAthena::PickTeam (8.51 = 0xfa9b20) : logs "PickTeam for [%s] ...", (GameMode, EFortTeam, PC)
 	constexpr uintptr_t Restart = 0x10FD9B0;                            // AFortGameSessionDedicatedAthena::Restart, vtable 0x3C29E00 + 0x688 ; tailcall base 0x10FD6E0 (8.51 = 0x153cda0)

@@ -106,12 +106,17 @@ namespace PlayerController
 		AFortPlayerState* PlayerState = Cast<AFortPlayerState>(PlayerControllerAthena->PlayerState);
 		if (!PlayerState) return;
 
+#ifdef LATE_GAME
+        const bool bWasInAircraft = PlayerControllerAthena->IsInAircraft();
+#endif
 		ServerAttemptAircraftJumpOG(PlayerControllerAthena, ClientRotation);
 
 		if (PlayerControllerAthena->IsInAircraft() && !PlayerControllerAthena->MyFortPawn)
 			GameModeAthena->RestartPlayer(PlayerControllerAthena);
 #ifdef LATE_GAME
 		LateGame621::GiveLoadoutOnExit(PlayerControllerAthena);
+        if (bWasInAircraft) LateGame621::NotifyAircraftExit(PlayerControllerAthena);
+        LateGame621::CheckLandings(GameModeAthena);
 #endif
 	}
 
