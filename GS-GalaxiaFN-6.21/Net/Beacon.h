@@ -1,5 +1,7 @@
 #pragma once
 
+namespace GameMode { void TickRestart(UNetDriver* NetDriver); }
+
 namespace Beacon
 {
 	// [GALAXIA PATCH] NativeFunc : rempli par pattern, l'appel est ignore (avec log) si le pattern n'est pas trouve en 6.21
@@ -28,6 +30,36 @@ namespace Beacon
 	int32 RandomPort = 7777;
 #endif
 
+	// [GALAXIA PATCH] Ne limiter le bind que pendant l'ouverture de notre propre beacon de jeu.
+	bool bInitializingGameBeacon = false;
+	bool bFixedPortListenReady = false;
+
+	char InitListenHook(UNetDriver* NetDriver, void* InNotify, FURL& LocalURL, bool bReuseAddressAndPort, FString& ListenError)
+	{
+		const bool bGameListen = bInitializingGameBeacon && Beacon && NetDriver && Beacon->NetDriver == NetDriver;
+		if (bGameListen)
+		{
+			auto* IpDriver = Cast<UIpNetDriver>(NetDriver);
+			if (!IpDriver) return false;
+
+			// 6.21 : InitBase 0x442140 passe MaxPortCountToTry (+0x704) + 1 a BindNextPort.
+			// Une seule tentative sur le port configure, sans repli silencieux sur 7778/7779.
+			// Meme contexte GameNetDriver que l'ancien second appel, des l'unique initialisation.
+			NetDriver->World = UWorld::GetWorld();
+			NetDriver->NetDriverName = UKismetStringLibrary::Conv_StringToName(L"GameNetDriver");
+			IpDriver->MaxPortCountToTry = 0;
+			LocalURL.Port = RandomPort;
+		}
+
+		const char Result = InitListen(NetDriver, InNotify, LocalURL, bReuseAddressAndPort, ListenError);
+		if (bGameListen && Result && LocalURL.Port != RandomPort)
+		{
+			FN_LOG(LogBeacon, Error, "Port d'ecoute inattendu : %i au lieu de %i.", LocalURL.Port, RandomPort);
+			return false;
+		}
+		return Result;
+	}
+
 	void TickFlushHook(UNetDriver* NetDriver, float DeltaSeconds)
 	{
 		if (NetDriver)
@@ -46,62 +78,59 @@ namespace Beacon
 		}
 
 		TickFlush(NetDriver, DeltaSeconds);
+		GameMode::TickRestart(NetDriver);
 	}
 
 	void Listen()
 	{
+		UWorld* World = UWorld::GetWorld();
+		if (!World)
+		{
+			FN_LOG(LogBeacon, Error, "Failed to get World!");
+			return;
+		}
+		if (World->NetDriver) return;
+		if (!bFixedPortListenReady)
+		{
+			FN_LOG(LogBeacon, Error, "InitListen non hooke : ouverture du port fixe annulee.");
+			return;
+		}
+
 		Beacon = Util::SpawnActor<AOnlineBeaconHost>(AOnlineBeaconHost::StaticClass(), {}, {});
-		UWorld* World = Globals::GetWorld();
-		
-		if (!Beacon || !World)
+		if (!Beacon)
 		{
-			FN_LOG(LogBeacon, Error, "Failed to create Beacon or to get World!");
+			FN_LOG(LogBeacon, Error, "Failed to create Beacon!");
 			return;
 		}
 
-		Beacon->ListenPort = RandomPort - 1;
-
-		if (World->NetDriver)
+		// [8.51-ONLY] L'ancien premier bind sur un port auxiliaire fuyait au second InitListen.
+		// Beacon->ListenPort = RandomPort - 1;
+		Beacon->ListenPort = RandomPort;
+		bInitializingGameBeacon = true;
+		const bool bHostReady = InitHost(Beacon);
+		bInitializingGameBeacon = false;
+		if (!bHostReady || !Beacon->NetDriver)
 		{
-			FN_LOG(LogBeacon, Warning, "Beacon already created!");
+			FN_LOG(LogBeacon, Error, "InitHost a echoue sur le port fixe %i.", RandomPort);
 			return;
 		}
 
-		if (InitHost(Beacon))
+		World->NetDriver = Beacon->NetDriver;
+		World->NetDriver->NetDriverName = UKismetStringLibrary::Conv_StringToName(L"GameNetDriver");
+
+		// [8.51-ONLY] InitHost a deja appele InitListen : le refaire ecrasait le socket sans le fermer.
+		// InitListen(World->NetDriver, World, URL, true, Error);
+		// SetWorld remplace aussi le NetworkNotify du beacon par celui du monde (+0x230).
+		SetWorld(World->NetDriver, World);
+		World->LevelCollections[0].NetDriver = World->NetDriver;
+		World->LevelCollections[1].NetDriver = World->NetDriver;
+		FN_LOG(LogBeacon, Log, "Beacon listen on port %i", Beacon->ListenPort);
+
+		// [GALAXIA PATCH] Le detour survit au voyage serveur : ne pas le reinstaller a chaque carte.
+		if (!TickFlush)
 		{
-			World->NetDriver = Beacon->NetDriver;
-			FN_LOG(LogBeacon, Log, "Beacon created successful!");
-		}
-		else
-		{
-			FN_LOG(LogBeacon, Error, "Failed to InitHost!");
-			return;
-		}
-
-		if (World->NetDriver)
-		{
-			World->NetDriver->World = World;
-			World->NetDriver->NetDriverName = UKismetStringLibrary::Conv_StringToName(L"GameNetDriver");
-
-			FString Error;
-			auto URL = FURL();
-			URL.Port = RandomPort;
-
-			InitListen(World->NetDriver, World, URL, true, Error);
-			SetWorld(World->NetDriver, World);
-
-			World->LevelCollections[0].NetDriver = World->NetDriver;
-			World->LevelCollections[1].NetDriver = World->NetDriver;
-
-			FN_LOG(LogBeacon, Log, "Beacon listen on port %i", URL.Port);
-
 			uintptr_t PatternTickFlush = MinHook::FindPatternUnique(Patterns::TickFlush, "TickFlush");
-
-			MinHook::HookAddress(PatternTickFlush, "TickFlush", TickFlushHook, (void**)(&TickFlush)); // [GALAXIA PATCH] rien n'est installe si le pattern n'est pas trouve
-		}
-		else
-		{
-			FN_LOG(LogBeacon, Error, "Failed to listen!");
+			MinHook::HookAddress(PatternTickFlush, "TickFlush", TickFlushHook, (void**)(&TickFlush));
 		}
 	}
 
@@ -116,6 +145,8 @@ namespace Beacon
 		InitHost.Name = "InitHost";
 		InitListen.Func = decltype(InitListen.Func)(PatternInitListen);
 		InitListen.Name = "InitListen";
+		if (Offsets621::IsExpectedBuild())
+			bFixedPortListenReady = MinHook::HookAddress(PatternInitListen, "InitListen", InitListenHook, (void**)(&InitListen.Func));
 		SetWorld.Func = decltype(SetWorld.Func)(PatternSetWorld);
 		SetWorld.Name = "SetWorld";
 		ServerReplicateActors.Func = Offsets621::IsExpectedBuild() ? decltype(ServerReplicateActors.Func)(PatternServerReplicateActors) : nullptr;

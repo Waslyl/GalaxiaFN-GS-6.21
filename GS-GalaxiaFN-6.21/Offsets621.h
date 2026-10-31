@@ -46,7 +46,7 @@ namespace Offsets621
 	constexpr uintptr_t StartAircraftPhase = 0xC91F80;                  // AFortGameModeAthena::StartAircraftPhase (8.51 = 0xfb8070) : logs "AFortGameModeAthena::StartAircraftPhase: ...", (GameMode, octet)
 	constexpr uintptr_t HandlePostSafeZonePhaseChanged = 0x0;           // [OFFSET-TODO-6.21] AFortGameModeAthena::HandlePostSafeZonePhaseChanged (8.51 = 0xfb9830)
 	constexpr uintptr_t PickTeam = 0xC862C0;                            // AFortGameModeAthena::PickTeam (8.51 = 0xfa9b20) : logs "PickTeam for [%s] ...", (GameMode, EFortTeam, PC)
-	constexpr uintptr_t Restart = 0x0;                                  // [OFFSET-TODO-6.21] Restart (8.51 = 0x153cda0)
+	constexpr uintptr_t Restart = 0x10FD9B0;                            // AFortGameSessionDedicatedAthena::Restart, vtable 0x3C29E00 + 0x688 ; tailcall base 0x10FD6E0 (8.51 = 0x153cda0)
 	constexpr uintptr_t PreLogin = 0x0;                                 // [OFFSET-TODO-6.21] AFortGameModeAthena::PreLogin (8.51 = 0xFAABC0)
 	constexpr uintptr_t RemoveFromAlivePlayers = 0x0;                   // [OFFSET-TODO-6.21] AFortGameModeAthena::RemoveFromAlivePlayers (8.51 = 0xfae8c0, pattern Patterns::RemoveFromAlivePlayers)
 	constexpr uintptr_t PickSupplyDropLocation = 0x0;                   // [OFFSET-TODO-6.21] AFortAthenaMapInfo::PickSupplyDropLocation (8.51 = 0xf4fe80)

@@ -41,6 +41,37 @@ namespace GameMode
 	int OldSafeZonePhase;
 	bool bGetAircraftLoc = false;
 
+	// [GALAXIA PATCH] Ces pointeurs servent seulement d'identite : ne jamais dereferencer l'ancienne carte.
+	UWorld* MatchWorld = nullptr;
+	AFortGameModeAthena* MatchGameMode = nullptr;
+	ULONGLONG RestartAt = 0;
+	constexpr ULONGLONG RestartDelayMs = 15000;
+
+	void PrepareNewMatch(UWorld* World, AFortGameModeAthena* GameModeAthena)
+	{
+		if (MatchWorld == World && MatchGameMode == GameModeAthena &&
+			!(bRestart && !static_cast<AFortGameStateAthena*>(GameModeAthena->GameState)->bPlaylistDataIsLoaded))
+			return;
+
+		if (MatchWorld)
+			FN_LOG(LogGameMode, Log, "[Restart621] Nouvelle carte : etat du GS reinitialise.");
+
+		MatchWorld = World;
+		MatchGameMode = GameModeAthena;
+		RestartAt = 0;
+		bRestart = false;
+		bPreReadyToStartMatch = false;
+		bMatchStarted = false;
+		bWorldReady = false;
+		bStartMatch = false;
+		LateGamePlayerStart = nullptr;
+		AircraftLoc = {};
+		OldSafeZonePhase = 0;
+		bGetAircraftLoc = false;
+		Globals::World = nullptr;
+		Beacon::Beacon = nullptr;
+	}
+
 	__int64 PreLoginHook() { return 0; };
 
 	// Original ReadyToStartMatch (Faut les choquer)
@@ -54,6 +85,8 @@ namespace GameMode
 
 		UWorld* World = UWorld::GetWorld();
 		if (!World) return ReadyToStartMatchOG(GameModeAthena);
+
+		PrepareNewMatch(World, GameModeAthena);
 
 		if (!World->NetDriver)
 			Beacon::Listen(); // Listen
@@ -738,8 +771,22 @@ namespace GameMode
 		return ChooseTeam;
 	}
 	
-	void RestartHook(AFortGameSessionDedicated* GameSessionDedicated)
+	void RestartHook(AGameSession* GameSession)
 	{
+		UWorld* World = UWorld::GetWorld();
+		auto* GameModeAthena = World ? Cast<AFortGameModeAthena>(World->AuthorityGameMode) : nullptr;
+		if (!GameModeAthena || !GameSession || GameModeAthena->GameSession != GameSession || bRestart)
+			return;
+
+		// [GALAXIA PATCH] Une seule tentative par carte, y compris si un callback de session est reentrant.
+		bRestart = true;
+		auto* RestartFunction = GameModeAthena->Class->GetFunction("GameMode", "RestartGame");
+		if (!RestartFunction || !RestartFunction->ExecFunction)
+		{
+			FN_LOG(LogGameMode, Error, "[Restart621] GameMode.RestartGame introuvable : relance annulee.");
+			return;
+		}
+
 #ifdef SESSION
 
 #ifdef NORMAL
@@ -841,7 +888,53 @@ namespace GameMode
 		curl_easy_cleanup(curl);
 #endif // defined(SESSION) && defined(PLAYGROUND)
 
-		std::system("taskkill /f /im FortniteClient-Win64-Shipping.exe");
+		// [8.51-ONLY] Ancien redemarrage par arret du processus, conserve pour pouvoir le remettre plus tard.
+		// std::system("taskkill /f /im FortniteClient-Win64-Shipping.exe");
+
+		// [GALAXIA PATCH] 6.21 : exec 0x2AB8330 -> RestartGame 0x2643B80 -> ServerTravel("?Restart").
+		// Le moteur recharge la carte et gere ses acteurs/connexions dans le meme processus.
+		FN_LOG(LogGameMode, Log, "[Restart621] Relance native de la carte (PID %lu).", GetCurrentProcessId());
+		auto Flags = RestartFunction->FunctionFlags;
+		RestartFunction->FunctionFlags |= 0x400;
+		GameModeAthena->ProcessEvent(RestartFunction, nullptr);
+		RestartFunction->FunctionFlags = Flags;
+	}
+
+	void QueueRestartHook(AGameSession* GameSession)
+	{
+		UWorld* World = UWorld::GetWorld();
+		auto* GameModeAthena = World ? Cast<AFortGameModeAthena>(World->AuthorityGameMode) : nullptr;
+		if (!GameModeAthena || !GameSession || GameModeAthena->GameSession != GameSession || bRestart || RestartAt)
+			return;
+
+		RestartAt = GetTickCount64() + RestartDelayMs;
+		FN_LOG(LogGameMode, Log, "[Restart621] Nouvelle partie dans 15 secondes.");
+	}
+
+	void TickRestart(UNetDriver* NetDriver)
+	{
+		// [GALAXIA PATCH] Tick reseau du monde principal, meme sans joueur. ReceiveTick Blueprint est bloque.
+		UWorld* World = UWorld::GetWorld();
+		if (!Offsets621::IsExpectedBuild() || !World || !NetDriver || World->NetDriver != NetDriver || NetDriver->World != World)
+			return;
+
+		auto* GameModeAthena = Cast<AFortGameModeAthena>(World->AuthorityGameMode);
+		if (!GameModeAthena || World != MatchWorld || GameModeAthena != MatchGameMode || bRestart)
+			return;
+
+		static const FName WaitingPostMatch = UKismetStringLibrary::Conv_StringToName(L"WaitingPostMatch");
+		static const FName LeavingMap = UKismetStringLibrary::Conv_StringToName(L"LeavingMap");
+		if (GameModeAthena->MatchState == LeavingMap)
+			return;
+
+		// [GALAXIA PATCH] Le getter 6.21 (0xC79660 -> 0xEE51B0) cree une FortGameSession normale.
+		// RestartGame accepte AGameSession : exiger Dedicated ici annulait toute relance.
+		auto* Session = GameModeAthena->GameSession;
+		if (!RestartAt && GameModeAthena->MatchState == WaitingPostMatch)
+			QueueRestartHook(Session);
+
+		if (RestartAt && GetTickCount64() >= RestartAt)
+			RestartHook(Session);
 	}
 
 #if defined(LATE_GAME) || defined(ARENA)
@@ -922,12 +1015,12 @@ namespace GameMode
 		// MH_EnableHook((LPVOID)(InSDKUtils::GetImageBase() + 0xfa9b20));
 		MinHook::HookNative(Offsets621::PickTeam, "PickTeam", PickTeamHook, nullptr);
 
-#ifdef SESSION
-		// [OFFSET-TODO-6.21] Restart (8.51 = 0x153cda0)
+		// [8.51-ONLY] Restart (8.51 = 0x153cda0)
 		// MH_CreateHook((LPVOID)(InSDKUtils::GetImageBase() + 0x153cda0), RestartHook, nullptr);
 		// MH_EnableHook((LPVOID)(InSDKUtils::GetImageBase() + 0x153cda0));
-		MinHook::HookNative(Offsets621::Restart, "Restart", RestartHook, nullptr);
-#endif // SESSION
+		// [GALAXIA PATCH] Intercepter aussi la demande native sur deconnexion du dernier joueur.
+		if (Offsets621::IsExpectedBuild())
+			MinHook::HookNative(Offsets621::Restart, "Restart", QueueRestartHook, nullptr);
 
 		FN_LOG(LogInit, Log, "InitGameMode Success!");
 	}
